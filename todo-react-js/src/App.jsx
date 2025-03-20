@@ -1,57 +1,61 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import "./style.css";
+import TaskInput from "./TaskInput";
+import TaskList from "./TaskList";
+import Header from "./Header";
+import axios from "axios";
+import AppContextProvider from "./app-context";
+
+const APP_URL = "http://localhost:8080/todo";
 
 const ToDoApp = () => {
   const [tasks, setTasks] = useState([]);
   const [task, setTask] = useState("");
 
+  useEffect(() => {
+    axios.get(APP_URL)
+      .then(response => {
+        setTasks(response.data.slice(0, 10));
+      })
+      .catch(error => console.error("Error fetching tasks:", error));
+  }, []);
+
   const addTask = useCallback(() => {
     if (task.trim()) {
-      setTasks([...tasks, { name: task, completed: false }]);
-      setTask("");
+      axios.post(APP_URL, { name: task, completed: false })
+        .then(response => {
+          setTasks([...tasks, response.data]);
+          setTask("");
+        })
+        .catch(error => console.error("Error adding task:", error));
     }
   }, [task, tasks]);
 
-  const deleteTask = useCallback(
-    (index) => {
-      setTasks(tasks.filter((_, i) => i !== index));
-    }, [tasks]);
+  const deleteTask = useCallback((index) => {
+    const taskToDelete = tasks[index];
+    axios.delete(`${APP_URL}/${index}`)
+      .then(() => {
+        setTasks(tasks.filter((_, i) => i !== index));
+      })
+      .catch(error => console.error("Error deleting task:", error));
+  }, [tasks]);
 
-  const toggleTask = useCallback(
-    (index) => {
-      setTasks(
-        tasks.map((task, i) =>
-          i === index ? { ...task, completed: !task.completed } : task
-        )
-      );
-    }, [tasks]);
+  const toggleTask = useCallback((index) => {
+    const updatedTask = { ...tasks[index], completed: !tasks[index].completed };
+    axios.put(`${APP_URL}/${index}`, updatedTask)
+      .then(response => {
+        setTasks(tasks.map((task, i) => (i === index ? response.data : task)));
+      })
+      .catch(error => console.error("Error updating task:", error));
+  }, [tasks]);
 
   return (
     <div className="container">
-      <h1>To Do App</h1>
-      <div className="add-list-container">
-        <input
-          type="text"
-          value={task}
-          onChange={(e) => setTask(e.target.value)}
-          placeholder="Add To Do"
-        />
-        <button id="todo-add" onClick={addTask}>
-          ADD
-        </button>
-      </div>
-      {tasks.map((task, index) => (
-        <div key={index} className="list-container">
-          <button
-            id="todo-list"
-            className={task.completed ? "strike-decoration" : ""}
-            onClick={() => toggleTask(index)}> {task.name}            
-          </button>
-          <button id="todo-delete" onClick={() => deleteTask(index)}>
-            Delete
-          </button>
-        </div>
-      ))}
+      {/* <AppContextProvider> */}
+        <Header />
+        <TaskInput task={task} setTask={setTask} addTask={addTask} />
+        <TaskList tasks={tasks} toggleTask={toggleTask} deleteTask={deleteTask} />
+      {/* </AppContextProvider> */}
     </div>
   );
 };
